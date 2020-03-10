@@ -4,20 +4,16 @@ const util = require('util');
 const resolver = new (require('dns')).Resolver();
 resolver.setServers(['1.1.1.1']);
 
-
-const cloudflare = require('cloudflare');
+const HTTPS = require('https');
+const BASE_URL = 'https://api.cloudflare.com/client/v4/';
 
 class Challenge{
 	constructor(options){
 		this.options = options;
-		this.client = new cloudflare({
-			email: options.email,
-			key: options.key,
-			token: options.token
-		});
+		this.token = options.token;
 	}
 
-	static create(config){
+	static create(config) {
 		return new Challenge(Object.assign(config, this.options));
 	}
 
@@ -36,7 +32,7 @@ class Challenge{
 				return Promise.reject(`Could not find a zone for '${fullRecordName}'.`);
 			}
 			// add record
-			await this.client.dnsRecords.add(zone.id, {
+			await doApiRequest(this.token, '/zones/'+zone.id+'/dns_records', 'POST', {
 				type: 'TXT',
 				name: fullRecordName,
 				content: args.challenge.dnsAuthorization,
@@ -67,7 +63,7 @@ class Challenge{
 			}
 			for(const record of records){
 				if(record.name === fullRecordName && record.content === args.challenge.dnsAuthorization){
-					await this.client.dnsRecords.del(zone.id, record.id);
+					await doApiRequest(this.token, '/zones/'+zone.id+'/dns_records/'+record.id, 'DELETE');
 				}
 			}
 			// allow time for deletion to propagate
@@ -117,7 +113,7 @@ class Challenge{
 		try{
 			const zones = [];
 			for await(const zone of consumePages(pagination =>
-				this.client.zones.browse(pagination)
+				doApiRequest(this.token, '/zones', 'GET', pagination)
 			)){
 				zones.push(zone.name);
 			}
@@ -160,7 +156,7 @@ class Challenge{
 
 	async getZoneForDomain(domain){
 		for await(const zone of consumePages(pagination =>
-			this.client.zones.browse(pagination)
+			doApiRequest(this.token, '/zones', 'GET', pagination)
 		)){
 			if(domain.endsWith(zone.name)){
 				return zone;
@@ -173,7 +169,7 @@ class Challenge{
 		const records = [];
 
 		for await(const txtRecord of consumePages(pagination =>
-			this.client.dnsRecords.browse(zone.id, {
+			doApiRequest(this.token, '/zones/'+zone.id+'/dns_records', 'GET', {
 				...pagination,
 				type: 'TXT',
 				name
@@ -217,5 +213,21 @@ async function* consumePages(loader, pageSize = 10){
 function delay(ms){
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+const doApiRequest = (token, url, method, data) => new Promise((resolve, reject) => {
+	const req = HTTPS.request(BASE_URL + url, {
+		method,
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': 'Bearer ' + token,
+		}
+	}, res => {
+		const resp = [];
+		res.on('data', d => resp.push(d));
+		res.on('end', () => resolve(JSON.parse(Buffer.concat(resp).toString())));
+	})
+	if(data) req.write(JSON.stringify(data));
+	req.end();
+});
 
 module.exports = Challenge;
