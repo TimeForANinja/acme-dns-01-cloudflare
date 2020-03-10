@@ -1,9 +1,9 @@
 'use strict';
 
 const util = require('util');
-const dns = require('dns');
+const resolver = new (require('dns')).Resolver();
+resolver.setServers(['1.1.1.1']);
 
-const resolveTxtPromise = util.promisify(dns.resolveTxt);
 
 const cloudflare = require('cloudflare');
 
@@ -188,6 +188,12 @@ class Challenge{
 	}
 }
 
+const resolveTxtPromise = util.promisify(resolver.resolveTxt).bind(resolver);
+async function resolveTxt(fqdn){
+	const records = await resolveTxtPromise(fqdn);
+	return records.map(r => r.join(' '));
+}
+
 /* Thanks to https://github.com/buschtoens/le-challenge-cloudflare for this great pagination implementation */
 async function* consumePages(loader, pageSize = 10){
 	for(let page = 1, didReadAll = false; !didReadAll; page++){
@@ -206,11 +212,6 @@ async function* consumePages(loader, pageSize = 10){
 
 		didReadAll = page >= response.result_info.total_pages;
 	}
-}
-
-async function resolveTxt(fqdn){
-	const records = await resolveTxtPromise(fqdn);
-	return records.map(r => r.join(' '));
 }
 
 function delay(ms){
