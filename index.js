@@ -39,7 +39,7 @@ class Challenge{
 				ttl: 120
 			});
 			if(this.options.verifyPropagation){
-				await Challenge.verifyPropagation(args.challenge, this.options.waitFor, this.options.retries);
+				await Challenge.verifyPropagation(args.challenge, this.options.verbose, this.options.waitFor, this.options.retries);
 			}
 			return null;
 		}catch(err){
@@ -67,7 +67,7 @@ class Challenge{
 				}
 			}
 			// allow time for deletion to propagate
-			await Challenge.verifyPropagation(Object.assign({}, args.challenge, {removed: true}));
+			await Challenge.verifyPropagation(Object.assign({}, args.challenge, {removed: true}), this.options.verbose);
 			return null;
 		}catch(err){
 			throw new Error(err);
@@ -123,7 +123,7 @@ class Challenge{
 		}
 	}
 
-	static async verifyPropagation(challenge, waitFor = 10000, retries = 30){
+	static async verifyPropagation(challenge, verbose = false, waitFor = 10000, retries = 30){
 		const fullRecordName = challenge.dnsPrefix + '.' + challenge.dnsZone;
 		for(let i = 0; i < retries; i++){
 			try{
@@ -146,8 +146,10 @@ class Challenge{
 				if(err.code === 'ENODATA' && challenge.removed === true){
 					return;
 				}
-				console.error(err);
-				console.log(`Waiting for ${waitFor} ms before attempting propagation verification retry ${i + 1} / ${retries}.`);
+				if(verbose) {
+					console.error(err);
+					console.log(`Waiting for ${waitFor} ms before attempting propagation verification retry ${i + 1} / ${retries}.`);
+				}
 				await delay(waitFor);
 			}
 		}
