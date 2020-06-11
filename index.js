@@ -4,6 +4,7 @@ const util = require('util');
 const resolver = new (require('dns')).Resolver();
 resolver.setServers(['1.1.1.1']);
 
+const QS = require('querystring');
 const HTTPS = require('https');
 const BASE_URL = 'https://api.cloudflare.com/client/v4';
 
@@ -31,7 +32,7 @@ class Challenge{
 				return Promise.reject(`Could not find a zone for '${fullRecordName}'.`);
 			}
 			// add record
-			await doApiRequest(this.options, '/zones/'+zone.id+'/dns_records', 'POST', {
+			await doApiRequest(this.options, `/zones/${zone.id}/dns_records`, null, 'POST', {
 				type: 'TXT',
 				name: fullRecordName,
 				content: args.challenge.dnsAuthorization,
@@ -62,7 +63,7 @@ class Challenge{
 			}
 			for(const record of records){
 				if(record.name === fullRecordName && record.content === args.challenge.dnsAuthorization){
-					await doApiRequest(this.options, '/zones/'+zone.id+'/dns_records/'+record.id, 'DELETE');
+					await doApiRequest(this.options, `/zones/${zone.id}/dns_records/${record.id}`, null, 'DELETE');
 				}
 			}
 			// allow time for deletion to propagate
@@ -113,7 +114,7 @@ class Challenge{
 		try{
 			const zones = [];
 			for await(const zone of consumePages(pagination =>
-				doApiRequest(this.options, '/zones', 'GET', pagination)
+				doApiRequest(this.options, '/zones', pagination, 'GET')
 			)){
 				zones.push(zone.name);
 			}
@@ -158,7 +159,7 @@ class Challenge{
 
 	async getZoneForDomain(domain){
 		for await(const zone of consumePages(pagination =>
-			doApiRequest(this.options, '/zones', 'GET', pagination)
+			doApiRequest(this.options, '/zones', pagination, 'GET')
 		)){
 			if(domain.endsWith(zone.name)){
 				return zone;
@@ -171,11 +172,11 @@ class Challenge{
 		const records = [];
 
 		for await(const txtRecord of consumePages(pagination =>
-			doApiRequest(this.options, '/zones/'+zone.id+'/dns_records', 'GET', {
+			doApiRequest(this.options, `/zones/${zone.id}/dns_records`, {
 				...pagination,
 				type: 'TXT',
 				name
-			})
+			}, 'GET')
 		)){
 			if(txtRecord.name === name){
 				records.push(txtRecord);
@@ -216,9 +217,9 @@ function delay(ms){
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const doApiRequest = (options, url, method, data) => new Promise((resolve, reject) => {
+const doApiRequest = (options, url, urlData, method, data) => new Promise((resolve, reject) => {
 	const auth = options.globalKey ? {'Authorization': 'Bearer ' + options.globalKey} : {'X-Auth-Key': options.apiKey, 'X-Auth-Email': options.apiMail};
-	const req = HTTPS.request(BASE_URL + url, {
+	const req = HTTPS.request(BASE_URL + url + (urlData ? '?'+QS.encode(urlData) : ''), {
 		method,
 		headers: Object.assign({
 			'Content-Type': 'application/json',
