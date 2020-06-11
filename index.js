@@ -5,7 +5,7 @@ const resolver = new (require('dns')).Resolver();
 resolver.setServers(['1.1.1.1']);
 
 const HTTPS = require('https');
-const BASE_URL = 'https://api.cloudflare.com/client/v4/';
+const BASE_URL = 'https://api.cloudflare.com/client/v4';
 
 class Challenge{
 	constructor(options){
@@ -68,7 +68,8 @@ class Challenge{
 			// allow time for deletion to propagate
 			await Challenge.verifyPropagation(Object.assign({}, args.challenge, {removed: true}), this.options.verbose);
 			return null;
-		}catch(err){
+		} catch(err) {
+			// TODO: Don't think this makes sense...
 			throw new Error(err);
 		}
 	}
@@ -221,12 +222,12 @@ const doApiRequest = (options, url, method, data) => new Promise((resolve, rejec
 		method,
 		headers: Object.assign({
 			'Content-Type': 'application/json',
+			'Content-Length': data ? Buffer.byteLength(JSON.stringify(data)) : 0,
 		}, auth),
 	}, res => {
 		const resp = [];
 		res.on('data', d => resp.push(d));
 		res.on('end', () => resolve(JSON.parse(Buffer.concat(resp).toString())));
-	})
 	});
 	if(data) req.write(JSON.stringify(data));
 	req.end();
