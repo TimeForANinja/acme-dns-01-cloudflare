@@ -13,9 +13,9 @@ const tester = require("acme-dns-01-test");
 
 const type = "dns-01";
 const challenger = require("./index.js").create({
-	token: process.env.CLOUDFLARE_GLOBAL_KEY,
-	email: process.env.CLOUDFLARE_APIMAIL,
-	key: process.env.CLOUDFLARE_APIKEY,
+	globalKey: process.env.CLOUDFLARE_GLOBAL_KEY,
+	apiMail: process.env.CLOUDFLARE_APIMAIL,
+	apiKey: process.env.CLOUDFLARE_APIKEY,
 	verifyPropagation: true
 });
 

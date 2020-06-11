@@ -10,7 +10,6 @@ const BASE_URL = 'https://api.cloudflare.com/client/v4/';
 class Challenge{
 	constructor(options){
 		this.options = options;
-		this.token = options.token;
 	}
 
 	static create(config) {
@@ -32,7 +31,7 @@ class Challenge{
 				return Promise.reject(`Could not find a zone for '${fullRecordName}'.`);
 			}
 			// add record
-			await doApiRequest(this.token, '/zones/'+zone.id+'/dns_records', 'POST', {
+			await doApiRequest(this.options, '/zones/'+zone.id+'/dns_records', 'POST', {
 				type: 'TXT',
 				name: fullRecordName,
 				content: args.challenge.dnsAuthorization,
@@ -63,7 +62,7 @@ class Challenge{
 			}
 			for(const record of records){
 				if(record.name === fullRecordName && record.content === args.challenge.dnsAuthorization){
-					await doApiRequest(this.token, '/zones/'+zone.id+'/dns_records/'+record.id, 'DELETE');
+					await doApiRequest(this.options, '/zones/'+zone.id+'/dns_records/'+record.id, 'DELETE');
 				}
 			}
 			// allow time for deletion to propagate
@@ -113,7 +112,7 @@ class Challenge{
 		try{
 			const zones = [];
 			for await(const zone of consumePages(pagination =>
-				doApiRequest(this.token, '/zones', 'GET', pagination)
+				doApiRequest(this.options, '/zones', 'GET', pagination)
 			)){
 				zones.push(zone.name);
 			}
@@ -158,7 +157,7 @@ class Challenge{
 
 	async getZoneForDomain(domain){
 		for await(const zone of consumePages(pagination =>
-			doApiRequest(this.token, '/zones', 'GET', pagination)
+			doApiRequest(this.options, '/zones', 'GET', pagination)
 		)){
 			if(domain.endsWith(zone.name)){
 				return zone;
@@ -171,7 +170,7 @@ class Challenge{
 		const records = [];
 
 		for await(const txtRecord of consumePages(pagination =>
-			doApiRequest(this.token, '/zones/'+zone.id+'/dns_records', 'GET', {
+			doApiRequest(this.options, '/zones/'+zone.id+'/dns_records', 'GET', {
 				...pagination,
 				type: 'TXT',
 				name
@@ -216,18 +215,19 @@ function delay(ms){
 	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const doApiRequest = (token, url, method, data) => new Promise((resolve, reject) => {
+const doApiRequest = (options, url, method, data) => new Promise((resolve, reject) => {
+	const auth = options.globalKey ? {'Authorization': 'Bearer ' + options.globalKey} : {'X-Auth-Key': options.apiKey, 'X-Auth-Email': options.apiMail};
 	const req = HTTPS.request(BASE_URL + url, {
 		method,
-		headers: {
+		headers: Object.assign({
 			'Content-Type': 'application/json',
-			'Authorization': 'Bearer ' + token,
-		}
+		}, auth),
 	}, res => {
 		const resp = [];
 		res.on('data', d => resp.push(d));
 		res.on('end', () => resolve(JSON.parse(Buffer.concat(resp).toString())));
 	})
+	});
 	if(data) req.write(JSON.stringify(data));
 	req.end();
 });
