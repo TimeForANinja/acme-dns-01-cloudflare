@@ -2,7 +2,7 @@
 
 /* eslint-disable no-process-exit */
 if(!process.env.CLOUDFLARE_GLOBAL_KEY && !(process.env.CLOUDFLARE_EMAIL && process.env.CLOUDFLARE_APIKEY)){
-	console.error('Missing CLOUDFLARE_GLOBAL_KEY or both CLOUDFLARE_EMAIL and CLOUDFLARE_APIKEY env');
+	console.error('Missing CLOUDFLARE_GLOBAL_KEY or one of CLOUDFLARE_EMAIL and CLOUDFLARE_APIKEY env');
 	process.exit(1);
 }
 if(!process.env.DOMAIN){
